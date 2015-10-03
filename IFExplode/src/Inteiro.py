@@ -20,17 +20,20 @@ from pygame.locals import *
 #green = pygame.Color( 0, 255, 0 )
 #blue = pygame.Color( 0, 0, 255 )
 
-class Block( pygame.sprite.Sprite): # Usa a classe sprite do java
+class Player (pygame.sprite.Sprite):
     # define as propriedades da imagem como cor e tamanho
-    def __init__(self, color = blue, largura = 64, altura = 64):
+    def __init__(self, color = blue, largura = 28, altura = 44):
         
-        super( Block, self ).__init__() #pega as caracteristicas do pai e construtor
+        super( Player, self ).__init__() #pega as caracteristicas do pai e construtor
         self.image = pygame.Surface((largura, altura))
         self.image.fill(color) #preenche a imagem com uma cor
+        
         self.set_properties()
         
         self.hspeed = 0
         self.vspeed = 0
+        
+        self.fase = None
     
     def set_properties(self):
         
@@ -118,6 +121,56 @@ class Block( pygame.sprite.Sprite): # Usa a classe sprite do java
         else: self.vspeed += gravidade
         
         
+class Block( pygame.sprite.Sprite): # Usa a classe sprite do java
+    
+    def __init__(self, x, y,  largura, altura, color = blue):
+        
+        super( Block, self ).__init__() #pega as caracteristicas do pai e construtor
+        self.image = pygame.Surface((largura, altura))
+        self.image.fill(color) #preenche a imagem com uma cor
+        
+        self.rect = self.image.get_rect() #da propriedades de um retangulo a imagem feito pelao pygame
+        
+        #self.origin_x = self.rect.centerx
+        #self.origin_y = self.rect.centery
+        
+        self.rect.x = x #- self.origin_x
+        self.rect.y = y #- self.origin_y
+
+class Fase(object): #utiliza o novo jeito do python de usar heranca colocando object para conseguir chamar as funcoes da classe pai
+    
+    def __init__(self, objeto_player):
+        
+        self.lista_de_objetos = pygame.sprite.Group() # grupo para os objeto das plataformas da fase
+        self.objeto_player = objeto_player
+        
+    def update(self):
+        self.lista_de_objetos.update() #atualiza todos os objetos do grupo de objetos
+    
+    def draw(self, window):
+        
+        window.fill(white) #desenha o fundo da janela
+        
+        self.lista_de_objetos.draw(window) #desenha os objetos da fase na janela
+        
+    
+    
+class Fase_1(Fase):
+    
+    def __init__(self, objeto_player):
+        
+        super (Fase_1, self).__init__(objeto_player)
+        
+        level = [
+            # [ x, y, largura, altura, color ]
+            [2, 124, 365, 47, black],
+            [200, 324, 280, 47, black]
+        ]
+        
+        for block in level:
+            block = Block(block[0], block[1], block[2], block[3], block[4])
+            self.lista_de_objetos.add(block)
+        
 
 def set_message( text ):
     global message, previous_message
@@ -135,35 +188,28 @@ pygame.display.set_caption('IFExplode!!!')
 clock = pygame.time.Clock()#funcao clock controla o tempo dentro da janela
 frames_por_segundo = 60
 
-#Maneja os blocos na janela
-block_grupo = pygame.sprite.Group() # Cria um grupo de sprites para os blocos
+lista_objetos_ativos = pygame.sprite.Group() #cria lista de objetos ativo
+player = Player() #cria o player
+player.set_image(os.path.join("Images", "PlayerV1.png"))
+player.set_position(40, 40) #define uma posicao para o player
 
-bloco1 = Block()
-bloco1.set_image(os.path.join("Images","Player.png"))
-bloco1.set_position( window_largura/2 - 150, window_altura/2-100 )
+lista_objetos_ativos.add(player) #adiciona player na lista de objetos ativos
 
-bloco2 = Block( red )
-bloco2.set_position( window_largura/2 , window_altura/2 + 80 )
+lista_Fases = [] #uma lista para as fases
+lista_Fases.append(Fase_1( player )) #adiciona a fase 1 a lista e passa o objeto player naquela fase
 
-bloco3 = Block( blue, 400, 200 )
-bloco3.set_position( window_largura/5 , window_altura/2 + 300 )
+fase_atual_numero = 0 # um numero para identificar a fase atual
+fase_atual = lista_Fases[fase_atual_numero] #guarda a posicao da fase atual da lista
 
-bloco4 = Block( green, 400, 1000 )
-bloco4.set_position( window_largura , window_altura/2 + 300 )
+player.fase = fase_atual
 
-bloco5 = Block( red )
-bloco5.set_position( window_largura/2 + 200 , window_altura/2 - 50 )
 
-block_grupo.add(bloco5, bloco4, bloco3, bloco1, bloco2 ) #adiciona os dois blocos criados no grupo
 
 font = pygame.font.SysFont("Times New Roman, Arial", 30) # carrega a fonte 
 #text = font.render("IFExplode!!!", True, black) #renderiza a fonte
 
 massage = previous_message = None
 set_message("")        
-            
-collidable_objects = pygame.sprite.Group()
-collidable_objects.add(bloco5, bloco4, bloco3, bloco2)
 
 running = True # Variavel para o loop da janela principal
             
@@ -173,25 +219,29 @@ while running:
         (event.type == pygame.KEYDOWN and \
         (event.key == pygame.K_ESCAPE or event.key == pygame.K_q)):
             running = False
-            
-    clock.tick(frames_por_segundo) #trava a qnt de frames
-    window.fill( white ) # fill eh uma funcao do pygame para encher de cor uma superficie
-    bloco1.update(collidable_objects, event )
-    event = None
     
-    if(pygame.sprite.collide_rect(bloco1, bloco2)):
-        set_message(" Bateu sa porra !!! ")
-    else:
-        set_message("")
+    #Funcoes de atualizacao
     
-    if(message != previous_message):
-        set_message(message)
+    player.update(fase_atual.lista_de_objetos, event)
+    event = None #esvazia a variavel event
+    fase_atual.update()
     
-    block_grupo.draw(window) #desenha o grupo na janela
-    window.blit(message, (window_largura/2 - message.get_rect().width/2 , window_altura/2 - 100 ))
+    
+    #Testes de logica
+    
+    #Desenha e redesenha tudo
+    
+    fase_atual.draw(window)
+    lista_objetos_ativos.draw(window)
+    
+    
+    #Atrasa a Framerate
+    
+    clock.tick(frames_por_segundo)
+    
+    #Atualiza a tela
     
     pygame.display.update()
-    
+            
 
-
-pygame.display.quit()
+pygame.quit()
